@@ -40,20 +40,20 @@ def get_macd_rsi_signals(data):
 # p3Binance\bot_functions.py dosyası
 
 def calculate_macd(data):
-    # Eğer data bir liste ise, bir DataFrame'e dönüştür
-    if isinstance(data, list):
-        # Sütun adlarını veri yapısına uygun olarak değiştirin
-        data = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'number_of_trades', 'taker_buy_base', 'taker_buy_quote', 'ignored'])
-        data[['open', 'high', 'low', 'close', 'volume']] = data[['open', 'high', 'low', 'close', 'volume']].apply(pd.to_numeric)
-
     short_window = 12
     long_window = 26
+    signal_window = 9
 
-    short_ema = data['close'].ewm(span=short_window, adjust=False).mean()
-    long_ema = data['close'].ewm(span=long_window, adjust=False).mean()
+    # 'data' içindeki 'close' değerlerini bir pandas serisine dönüştürme
+    close_data = pd.Series(data['close'])
 
+    # Kısa ve uzun hareketli ortalamaları hesaplama
+    short_ema = close_data.ewm(span=short_window, adjust=False).mean()
+    long_ema = close_data.ewm(span=long_window, adjust=False).mean()
+
+    # MACD ve sinyal çizgisini hesaplama
     macd = short_ema - long_ema
-    signal_line = macd.ewm(span=9, adjust=False).mean()
+    signal_line = macd.ewm(span=signal_window, adjust=False).mean()
 
     return macd, signal_line
 
@@ -111,20 +111,38 @@ def convert_candles(candles):
 
 # Calculates the Relative Strength Index (RSI) indicator
 def calculate_rsi(data, window=14):
-    delta = data['close'].diff(1)
-    gain = (delta.where(delta > 0, 0)).fillna(0)
-    loss = (-delta.where(delta < 0, 0)).fillna(0)
+    # 'data' içindeki 'close' değerlerini bir pandas serisine dönüştürme
+    close_data = pd.Series(data['close'])
+
+    # Fiyat değişimlerini hesaplama
+    delta = close_data.diff(1)
+
+    # Pozitif ve negatif değişimleri ayrı ayrı hesaplama
+    gain = (delta.where(delta > 0, 0))
+    loss = (-delta.where(delta < 0, 0))
+
+    # Ortalama kazanç ve kaybı hesaplama
     avg_gain = gain.rolling(window=window, min_periods=1).mean()
     avg_loss = loss.rolling(window=window, min_periods=1).mean()
+
+    # RS ve RSI değerlerini hesaplama
     rs = avg_gain / avg_loss
     rsi = 100 - (100 / (1 + rs))
+
     return rsi
 
 # Processes high-frequency data and returns processed data
 def process_high_frequency_data(data):
-    # Example logic to process high-frequency data
-    # This can be customized based on specific requirements
-    processed_data = data.resample('1T').ohlc()
+    # 'data' sözlüğünü bir pandas DataFrame'e dönüştürme
+    data_df = pd.DataFrame(data)
+
+    # 'timestamp' sütununu bir tarih/zaman indeksi olarak ayarlama
+    data_df['timestamp'] = pd.to_datetime(data_df['timestamp'])
+    data_df.set_index('timestamp', inplace=True)
+
+    # Verileri dakika bazında yeniden örneklemek ve OHLC değerlerini hesaplamak
+    processed_data = data_df.resample('1T').ohlc()
+
     return processed_data
 
 # Executes advanced trades based on the given signals
