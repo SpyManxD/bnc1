@@ -1,7 +1,7 @@
 import bot_functions as bf
 import config as cfg
 import time
-import traceback  # For detailed error handling
+import traceback
 
 # Connect to the Binance API and produce a client
 client = bf.init_client()
@@ -21,14 +21,24 @@ try:
             # Retrieve market data
             data = bf.get_data(client, symbol, period)
 
+            # Check if data is valid
+            if data is None:
+                print(f"Failed to retrieve data for {symbol} - {period}")
+                continue
+
             # Advanced Strategy Selection: MACD and RSI Combination
             signals = bf.get_macd_rsi_signals(data)
+
+            # Check if signals are valid
+            if signals is None:
+                print(f"Failed to generate signals for {symbol} - {period}")
+                continue
 
             # High-Frequency Data Processing
             processed_data = bf.process_high_frequency_data(data)
 
             # Advanced Automatic Trade Execution
-            bf.execute_advanced_trades(client, symbol, signals)
+            bf.execute_advanced_trades(client, symbol, signals, leverage, margin_type, trailing_percentage)
 
             # Advanced Real-time Monitoring and Alerts
             bf.monitor_and_alert(client, symbol)
@@ -42,4 +52,4 @@ except Exception as e:
     print("An error occurred while executing the bot:")
     print(str(e))
     print("Stack Trace:")
-    traceback.print_exc()  # Printing the detailed stack trace of the error
+    traceback.print_exc()
