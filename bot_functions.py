@@ -18,6 +18,63 @@ def singlePrint(string):
     print(string)
     blockPrint()
 
+def get_macd_rsi_signals(data):
+    # Eğer data bir liste ise, bir DataFrame'e dönüştür
+    if isinstance(data, list):
+        # Sütun adlarını veri yapısına uygun olarak değiştirin
+        data = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'number_of_trades', 'taker_buy_base', 'taker_buy_quote', 'ignored'])
+        data[['open', 'high', 'low', 'close', 'volume']] = data[['open', 'high', 'low', 'close', 'volume']].apply(pd.to_numeric)
+
+    macd, signal_line = calculate_macd(data)
+    rsi = calculate_rsi(data)
+    signals = []
+    for i in range(len(data)):
+        if macd[i] > signal_line[i] and rsi[i] < 30:
+            signals.append('BUY')
+        elif macd[i] < signal_line[i] and rsi[i] > 70:
+            signals.append('SELL')
+        else:
+            signals.append('HOLD')
+    return signals
+
+# p3Binance\bot_functions.py dosyası
+
+def calculate_macd(data):
+    # Eğer data bir liste ise, bir DataFrame'e dönüştür
+    if isinstance(data, list):
+        # Sütun adlarını veri yapısına uygun olarak değiştirin
+        data = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'number_of_trades', 'taker_buy_base', 'taker_buy_quote', 'ignored'])
+        data[['open', 'high', 'low', 'close', 'volume']] = data[['open', 'high', 'low', 'close', 'volume']].apply(pd.to_numeric)
+
+    short_window = 12
+    long_window = 26
+
+    short_ema = data['close'].ewm(span=short_window, adjust=False).mean()
+    long_ema = data['close'].ewm(span=long_window, adjust=False).mean()
+
+    macd = short_ema - long_ema
+    signal_line = macd.ewm(span=9, adjust=False).mean()
+
+    return macd, signal_line
+
+
+def get_data(client, symbol):
+    # Belirli bir sembol için tarihsel fiyat verilerini alın
+    # Örnek olarak, son 100 mumun 1 dakikalık verilerini alabilirsiniz
+    klines = client.futures_klines(symbol=symbol, interval=client.KLINE_INTERVAL_1MINUTE, limit=100)
+
+    # Verileri uygun bir biçime dönüştürün (örneğin, pandas DataFrame)
+    data = {
+        'timestamp': [int(k[0]) for k in klines],
+        'open': [float(k[1]) for k in klines],
+        'high': [float(k[2]) for k in klines],
+        'low': [float(k[3]) for k in klines],
+        'close': [float(k[4]) for k in klines],
+        'volume': [float(k[5]) for k in klines]
+    }
+
+    return data
+
 # Initializes the Binance client
 def init_client():
     keys = cfg.getAPIKeys()
@@ -52,14 +109,6 @@ def convert_candles(candles):
     df[['open', 'high', 'low', 'close', 'volume']] = df[['open', 'high', 'low', 'close', 'volume']].apply(pd.to_numeric)
     return df
 
-# Calculates the Moving Average Convergence Divergence (MACD) indicator
-def calculate_macd(data, short_window=12, long_window=26, signal_window=9):
-    short_ema = data['close'].ewm(span=short_window, adjust=False).mean()
-    long_ema = data['close'].ewm(span=long_window, adjust=False).mean()
-    macd = short_ema - long_ema
-    signal_line = macd.ewm(span=signal_window, adjust=False).mean()
-    return macd, signal_line
-
 # Calculates the Relative Strength Index (RSI) indicator
 def calculate_rsi(data, window=14):
     delta = data['close'].diff(1)
@@ -77,20 +126,6 @@ def process_high_frequency_data(data):
     # This can be customized based on specific requirements
     processed_data = data.resample('1T').ohlc()
     return processed_data
-
-# Generates trading signals based on MACD and RSI indicators
-def get_macd_rsi_signals(data):
-    macd, signal_line = calculate_macd(data)
-    rsi = calculate_rsi(data)
-    signals = []
-    for i in range(len(data)):
-        if macd[i] > signal_line[i] and rsi[i] < 30:
-            signals.append('BUY')
-        elif macd[i] < signal_line[i] and rsi[i] > 70:
-            signals.append('SELL')
-        else:
-            signals.append('HOLD')
-    return signals
 
 # Executes advanced trades based on the given signals
 def execute_advanced_trades(client, symbol, signals, leverage, margin_type, trailing_percentage):
