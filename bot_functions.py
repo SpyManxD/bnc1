@@ -3,6 +3,7 @@ import sys
 import pandas as pd
 from binance.client import Client
 import config as cfg
+from binance_f import RequestClient
 
 # Redirects stdout to null to disable print
 def blockPrint():
@@ -158,10 +159,16 @@ def execute_advanced_trades(client, symbol, signals, leverage, margin_type, trai
 
 # Monitors the market and sends alerts in real-time
 def monitor_and_alert(client, symbol):
-    # Example logic to monitor the market and send alerts
-    # This can be customized based on specific requirements
-    current_price = client.futures_ticker_price(symbol=symbol)['price']
-    singlePrint(f"Current price for {symbol}: {current_price}")
+    request_client = RequestClient(api_key=client.API_KEY, secret_key=client.API_SECRET)
+    ticker_price_list = request_client.get_symbol_price_ticker(symbol=symbol)
+
+    # Listenin içeriğini yazdır
+    print(f"Ticker price list for {symbol}: {ticker_price_list}")
+
+    # İlk öğenin fiyatını al (eğer uygunsa)
+    current_price = ticker_price_list[0].price if ticker_price_list else None
+    print(f"Current price for {symbol}: {current_price}")
+
 
 # Implements dynamic risk management strategies
 def dynamic_risk_management(client, symbols):
