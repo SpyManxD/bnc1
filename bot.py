@@ -8,42 +8,40 @@ client = bf.init_client()
 
 # Load settings from settings.json
 settings = cfg.getBotSettings()
-symbols = settings.symbols
-leverage = int(settings.leverage)
-margin_type = settings.margin_type
-confirmation_periods = settings.trading_periods.split(",")
-trailing_percentage = float(settings.trailing_percentage)
+symbols = settings['symbols']
+leverage = int(settings['leverage'])
+margin_type = settings['margin_type']
+trailing_percentage = float(settings['trailing_percentage'])
 
 # Main trading loop
 try:
     for symbol in symbols:
-        for period in confirmation_periods:
-            # Retrieve market data
-            data = bf.get_data(client, symbol, period)
+        # Retrieve market data
+        data = bf.get_data(client, symbol)
 
-            # Check if data is valid
-            if data is None:
-                print(f"Failed to retrieve data for {symbol} - {period}")
-                continue
+        # Check if data is valid
+        if data is None:
+            print(f"Failed to retrieve data for {symbol}")
+            continue
 
-            # Advanced Strategy Selection: MACD and RSI Combination
-            signals = bf.get_macd_rsi_signals(data)
+        # Advanced Strategy Selection: MACD and RSI Combination
+        signals = bf.get_macd_rsi_signals(data)
 
-            # Check if signals are valid
-            if signals is None:
-                print(f"Failed to generate signals for {symbol} - {period}")
-                continue
+        # Check if signals are valid
+        if signals is None:
+            print(f"Failed to generate signals for {symbol}")
+            continue
 
-            # High-Frequency Data Processing
-            processed_data = bf.process_high_frequency_data(data)
+        # High-Frequency Data Processing
+        processed_data = bf.process_high_frequency_data(data)
 
-            # Advanced Automatic Trade Execution
-            bf.execute_advanced_trades(client, symbol, signals, leverage, margin_type, trailing_percentage)
+        # Advanced Automatic Trade Execution
+        bf.execute_advanced_trades(client, symbol, signals, leverage, margin_type, trailing_percentage)
 
-            # Advanced Real-time Monitoring and Alerts
-            bf.monitor_and_alert(client, symbol)
+        # Advanced Real-time Monitoring and Alerts
+        bf.monitor_and_alert(client, symbol)
 
-            time.sleep(1)  # Sleep to avoid hitting the rate limits
+        time.sleep(1)  # Sleep to avoid hitting the rate limits
 
     # Advanced Dynamic Risk Management
     bf.dynamic_risk_management(client, symbols)

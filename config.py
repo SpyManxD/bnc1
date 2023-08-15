@@ -17,7 +17,7 @@ RSI_WINDOW = 14
 
 # Leverage and Margin Type
 LEVERAGE = 20
-MARGIN_TYPE = 'ISOLATED'
+MARGIN_TYPE = 'Cross'
 
 # Trailing Stop Percentage
 TRAILING_PERCENTAGE = 1
@@ -26,3 +26,15 @@ TRAILING_PERCENTAGE = 1
 APIKeys = namedtuple('APIKeys', ['api_key', 'api_secret'])
 def getAPIKeys():
     return APIKeys(API_KEY, API_SECRET)
+
+def getBotSettings():
+    return {
+        "symbols": SYMBOLS,
+        "macd_short_window": MACD_SHORT_WINDOW,
+        "macd_long_window": MACD_LONG_WINDOW,
+        "macd_signal_window": MACD_SIGNAL_WINDOW,
+        "rsi_window": RSI_WINDOW,
+        "leverage": LEVERAGE,
+        "margin_type": MARGIN_TYPE,
+        "trailing_percentage": TRAILING_PERCENTAGE
+    }

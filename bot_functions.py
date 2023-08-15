@@ -46,11 +46,11 @@ def execute_order(client, symbol, order_type, side, position_side, quantity):
 def round_to_precision(number, precision):
     return round(number, precision)
 
-# Converts candles to separate lists for open, high, low, close, and volume
+# Converts candles to a DataFrame with open, high, low, close, and volume columns
 def convert_candles(candles):
     df = pd.DataFrame(candles, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'number_of_trades', 'taker_buy_base', 'taker_buy_quote', 'ignored'])
     df[['open', 'high', 'low', 'close', 'volume']] = df[['open', 'high', 'low', 'close', 'volume']].apply(pd.to_numeric)
-    return df['open'], df['high'], df['low'], df['close'], df['volume']
+    return df
 
 # Calculates the Moving Average Convergence Divergence (MACD) indicator
 def calculate_macd(data, short_window=12, long_window=26, signal_window=9):
@@ -126,7 +126,7 @@ def advanced_multi_symbol_support(client, symbols):
         candles = client.futures_klines(symbol=symbol, interval=Client.KLINE_INTERVAL_1MINUTE)
         data = convert_candles(candles)
         signals = get_macd_rsi_signals(data)
-        execute_advanced_trades(client, symbol, signals, leverage=10, margin_type='ISOLATED', trailing_percentage=1)
+        execute_advanced_trades(client, symbol, signals, leverage=20, margin_type='Cross', trailing_percentage=1)
 
 # Implements advanced automatic trade execution
 def advanced_automatic_trade_execution(client, symbol):
@@ -140,13 +140,13 @@ def advanced_automatic_trade_execution(client, symbol):
         signals = get_macd_rsi_signals(data)
 
         # Execute trades based on the signals
-        execute_advanced_trades(client, symbol, signals, leverage=10, margin_type='ISOLATED', trailing_percentage=1)
+        execute_advanced_trades(client, symbol, signals, leverage=20, margin_type='Cross', trailing_percentage=1)
 
 
 # Main function to run the bot
 def run_bot():
     client = init_client()
-    symbols = ['BTCUSDT', 'ETHUSDT']
+    symbols = ["SUSHIUSDT", "BTSUSDT", "INJUSDT", "BNTUSDT", "RDNTUSDT", "ZRXUSDT", "HIGHUSDT", "WAVESUSDT", "SPELLUSDT", "XTZUSDT", "DARUSDT", "JOEUSDT", "XMRUSDT", "PENDLEUSDT", "ALICEUSDT", "HOOKUSDT", "REEFUSDT", "BATUSDT", "DOGEUSDT", "TRXUSDT", "STORJUSDT", "SNXUSDT", "XLMUSDT", "IOTXUSDT", "DASHUSDT", "UMAUSDT", "KAVAUSDT", "OXTUSDT", "RUNEUSDT", "APEUSDT", "BLUEBIRDUSDT", "BNXUSDT", "OPUSDT", "KEYUSDT", "DGBUSDT", "SKLUSDT", "FOOTBALLUSDT", "TOMOUSDT", "MTLUSDT", "ETHBTC", "KSMUSDT", "BNBBUSD", "TRBUSDT", "MANAUSDT", "FLOWUSDT", "CHRUSDT", "GALUSDT", "USDCUSDT", "OGNUSDT", "RNDRUSDT", "SCUSDT", "KNCUSDT", "BLURUSDT", "ENJUSDT", "ATOMUSDT", "SOLBUSD", "NMRUSDT", "ENSUSDT", "ATAUSDT", "AGIXUSDT", "IOSTUSDT", "HBARUSDT", "ZECUSDT", "IDEXUSDT", "GALAUSDT", "EDUUSDT", "GTCUSDT", "ALGOUSDT", "LRCUSDT", "STGUSDT", "STXUSDT", "ARPAUSDT", "CELOUSDT", "QNTUSDT", "1INCHUSDT", "TUSDT", "LINAUSDT", "ARUSDT", "FILUSDT", "DODOXUSDT", "SOLUSDT", "COMBOUSDT", "GMTUSDT", "MDTUSDT", "XVSUSDT", "GMXUSDT", "BANDUSDT", "LDOUSDT", "XRPBUSD", "CRVUSDT", "BELUSDT", "ONEUSDT", "APTUSDT", "ANKRUSDT", "MAVUSDT", "RAYUSDT", "API3USDT", "ASTRUSDT", "HOTUSDT", "QTUMUSDT", "IOTAUSDT", "BTCBUSD", "LITUSDT", "YFIUSDT", "ETHUSDT", "ALPHAUSDT", "WOOUSDT", "SFPUSDT", "RLCUSDT", "BTCSTUSDT", "1000XECUSDT", "FXSUSDT", "CFXUSDT", "AUDIOUSDT", "IDUSDT", "HFTUSDT", "NEOUSDT", "UNFIUSDT", "SANDUSDT", "CTKUSDT", "MINAUSDT", "CELRUSDT", "AGLDUSDT", "RSRUSDT", "RENUSDT", "JASMYUSDT", "PHBUSDT", "YGGUSDT", "EGLDUSDT", "LUNA2USDT", "ONTUSDT", "VETUSDT", "IMXUSDT", "LQTYUSDT", "COTIUSDT", "CVXUSDT", "ARBUSDT", "BAKEUSDT", "GRTUSDT", "FLMUSDT", "MASKUSDT", "BALUSDT", "SUIUSDT", "DENTUSDT", "TRUUSDT", "CKBUSDT", "SSVUSDT", "C98USDT", "ZENUSDT", "NEARUSDT", "1000SHIBUSDT", "ANTUSDT", "ETHBUSD", "TLMUSDT", "AAVEUSDT", "ICPUSDT", "1000LUNCUSDT", "RADUSDT", "AVAXUSDT", "MAGICUSDT", "ROSEUSDT", "MATICUSDT",	"XVGUSDT", "MKRUSDT", "PEOPLEUSDT", "THETAUSDT", "UNIUSDT", "PERPUSDT", "RVNUSDT", "ARKMUSDT", "NKNUSDT", "KLAYUSDT", "DEFIUSDT", "COMPUSDT", "BTCDOMUSDT", "BTCUSDT", "OMGUSDT", "ICXUSDT", "1000PEPEUSDT", "FETUSDT", "LEVERUSDT", "1000FLOKIUSDT", "FTMUSDT", "DOGEBUSD", "SXPUSDT", "XEMUSDT", "WLDUSDT", "ZILUSDT", "AXSUSDT", "DYDXUSDT", "OCEANUSDT", "CHZUSDT", "DUSKUSDT", "CTSIUSDT", "ACHUSDT"]
     advanced_multi_symbol_support(client, symbols)
     monitor_and_alert(client, 'BTCUSDT')
     dynamic_risk_management(client, symbols)
