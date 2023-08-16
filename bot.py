@@ -1,6 +1,9 @@
+from datetime import time
+
 from binance.client import Client
-from bot_functions import BinanceBot
-from config import getAPIKeys, getBotSettings
+from bot_functions import BinanceBot, getBotSettings, getAPIKeys
+import smtplib
+from email.message import EmailMessage
 
 # API anahtarlarını al
 api_keys = getAPIKeys()
@@ -45,14 +48,15 @@ class BinanceBot:
         klines = self.client.futures_klines(symbol=symbol, interval=Client.KLINE_INTERVAL_1MINUTE, limit=100)
         return klines
 
-    def calculate_macd(self, symbol_data):
-        # MACD hesaplama
-        close_prices = [float(data[4]) for data in symbol_data]
-        short_ema = self.calculate_ema(close_prices, self.settings['macd_short_window'])
-        long_ema = self.calculate_ema(close_prices, self.settings['macd_long_window'])
-        macd = [short - long for short, long in zip(short_ema, long_ema)]
-        signal_line = self.calculate_ema(macd, self.settings['macd_signal_window'])
-        return macd, signal_line
+    def calculate_macd(data):
+        if 'Close' in data:
+            short_window = data['Close'].ewm(span=12, adjust=False).mean()
+            long_window = data['Close'].ewm(span=26, adjust=False).mean()
+            macd_line = short_window - long_window
+            signal_line = macd_line.ewm(span=9, adjust=False).mean()
+            return macd_line, signal_line
+        else:
+            raise KeyError("Veri içinde 'Close' anahtarı bulunamadı.")
     def calculate_rsi(self, symbol_data):
         # RSI hesaplama
         close_prices = [float(data[4]) for data in symbol_data]
@@ -107,34 +111,45 @@ class BinanceBot:
 
         # İzleme ve uyarıları ayarlamak için kodlar
         self.monitor_and_alert(symbol)
-
-    def execute_trades(self, symbol, buy_signal, sell_signal):
+    def execute_trade(self, symbol, quantity, side, order_type):
         # Sinyallere göre işlem yapmak için kodlar
         # Örnek olarak, alım ve satım sinyallerine göre işlemleri yürütebilirsiniz
-        if buy_signal:
-            self.buy(symbol)
-        elif sell_signal:
-            self.sell(symbol)
+        try:
+            if self.buy_signal:  # buy_signal ve sell_signal'ın nereden geldiğini kontrol etmek gerekir
+                self.buy(symbol)
+            elif self.sell_signal:
+                self.sell(symbol)
 
-    def monitor_and_alert(self, symbol):
-        # İzleme ve uyarıları ayarlamak için kodlar
-        current_price = self.get_current_price(symbol)
-        if current_price > self.target_price[symbol]:
-            alert_message = f"{symbol} hedef fiyatı aştı! Şu anki fiyat: {current_price}"
-            self.send_email_alert(alert_message)
-            self.log_info(alert_message)
-            # İhtiyaca göre hedef fiyatı güncelleme veya diğer işlemler
+            order = self.client.create_order(
+                symbol=symbol,
+                side=side,
+                type=order_type,
+                quantity=quantity
+            )
+            return order
+        except Exception as e:
+            print(f"İşlem hatası: {e}")
+            return None
+
+def monitor_and_alert(self, symbol):
+    # İzleme ve uyarıları ayarlamak için kodlar
+    current_price = self.get_current_price(symbol)
+    if current_price > self.target_price[symbol]:
+        alert_message = f"{symbol} hedef fiyatı aştı! Şu anki fiyat: {current_price}"
+        self.send_email_alert(alert_message)
+        self.log_info(alert_message)
+
     def send_email_alert(self, message):
         # Uyarı mesajını e-posta olarak gönderme
         email = EmailMessage()
         email.set_content(message)
         email["Subject"] = "Binance Bot Uyarısı"
-        email["From"] = "your-email@example.com"
-        email["To"] = "recipient@example.com"
+        email["From"] = "semihozturk27@gmail.com"
+        email["To"] = "semihozturk27@gmail.com"
 
         with smtplib.SMTP_SSL("smtp.example.com", 465) as smtp:
-            smtp.login("your-email@example.com", "your-password")
-            smtp.send_message(email)
+            smtp.login("semihozturk27@gmail.com", "Medart2023*")
+        smtp.send_message(email)
 
         print(f"UYARI: {message} (E-posta gönderildi)")
     def log_info(self, info_message):
@@ -153,7 +168,8 @@ class BinanceBot:
 
 if __name__ == "__main__":
     # Bot ayarlarını al
-    settings = config.getBotSettings()
+    from bot_functions import getBotSettings  # bot_functions modülünden getBotSettings fonksiyonunu içe aktar
+    settings = getBotSettings()
 
     # BinanceBot sınıfının bir örneğini oluştur
     bot = BinanceBot(settings)
@@ -165,5 +181,3 @@ if __name__ == "__main__":
         print("Bot durduruldu.")
     except Exception as e:
         print(f"Bir hata oluştu: {e}")
-        # İhtiyaca göre ek hata işleme ve kayıt kodları
-

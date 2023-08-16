@@ -1,20 +1,18 @@
 {
-  "trade": {
-    "max_open_orders": 5,
-    "max_trade_size": 10,
-    "leverage": 20,
-    "margin_type": "Cross",
-    "trailing_percentage": 1
+  "symbols": ["BTCUSDT", "ETHUSDT", "LTCUSDT"],
+  "timeframe": "1m",
+  "risk_factor": 0.02,
+  "leverage": 10,
+  "stop_loss": 0.01,
+  "take_profit": 0.05,
+  "trading_mode": "live",
+  "alert_settings": {
+    "email": "semihozturk27@gmail.com",
+    "sms": "+905434089084",
+    "push_notifications": true
   },
-  "indicators": {
-    "macd_short_window": 12,
-    "macd_long_window": 26,
-    "macd_signal_window": 9,
-    "rsi_window": 14
-  },
-  "logging": {
-    "level": "INFO",
-    "file": "logs/bot_log.txt"
-  },
-  "symbols": ["BTCUSDT", "ETHUSDT", "XRPUSDT"]
+  "monitoring_settings": {
+    "refresh_rate": 5,
+    "log_file": "trading_log.txt"
+  }
 }

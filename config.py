@@ -1,55 +1,38 @@
-from collections import namedtuple
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Binance API Keys
-API_KEY = 'dMNJpsBZiSpVDk1Nt4jKAEbaaYJhFoBlEj7dVRslRMrZIaAGtdQ0AjyhEKHWIdKo'
-API_SECRET = 'OMOU4pT5sAnkIcQrpA028zAsmOWOGGRKv08F9IvzPbd9sFneO4NXyeAlvtCiYNdK'
-
-# Symbols to trade
-SYMBOLS = ["BTCUSDT", "ETHUSDT", "XRPUSDT"]  # İstediğiniz semboller
+API_KEY = os.getenv('API_KEY')
+API_SECRET = os.getenv('API_SECRET')
 
 # SYMBOLS = ["SUSHIUSDT", "BTSUSDT", "INJUSDT", "BNTUSDT", "RDNTUSDT", "ZRXUSDT", "HIGHUSDT", "WAVESUSDT", "SPELLUSDT", "XTZUSDT", "DARUSDT", "JOEUSDT", "XMRUSDT", "PENDLEUSDT", "ALICEUSDT", "HOOKUSDT", "REEFUSDT", "BATUSDT", "DOGEUSDT", "TRXUSDT", "STORJUSDT", "SNXUSDT", "XLMUSDT", "IOTXUSDT", "DASHUSDT", "UMAUSDT", "KAVAUSDT", "OXTUSDT", "RUNEUSDT", "APEUSDT", "BLUEBIRDUSDT", "BNXUSDT", "OPUSDT", "KEYUSDT", "DGBUSDT", "SKLUSDT", "FOOTBALLUSDT", "TOMOUSDT", "MTLUSDT", "ETHBTC", "KSMUSDT", "BNBBUSD", "TRBUSDT", "MANAUSDT", "FLOWUSDT", "CHRUSDT", "GALUSDT", "USDCUSDT", "OGNUSDT", "RNDRUSDT", "SCUSDT", "KNCUSDT", "BLURUSDT", "ENJUSDT", "ATOMUSDT", "SOLBUSD", "NMRUSDT", "ENSUSDT", "ATAUSDT", "AGIXUSDT", "IOSTUSDT", "HBARUSDT", "ZECUSDT", "IDEXUSDT", "GALAUSDT", "EDUUSDT", "GTCUSDT", "ALGOUSDT", "LRCUSDT", "STGUSDT", "STXUSDT", "ARPAUSDT", "CELOUSDT", "QNTUSDT", "1INCHUSDT", "TUSDT", "LINAUSDT", "ARUSDT", "FILUSDT", "DODOXUSDT", "SOLUSDT", "COMBOUSDT", "GMTUSDT", "MDTUSDT", "XVSUSDT", "GMXUSDT", "BANDUSDT", "LDOUSDT", "XRPBUSD", "CRVUSDT", "BELUSDT", "ONEUSDT", "APTUSDT", "ANKRUSDT", "MAVUSDT", "RAYUSDT", "API3USDT", "ASTRUSDT", "HOTUSDT", "QTUMUSDT", "IOTAUSDT", "BTCBUSD", "LITUSDT", "YFIUSDT", "ETHUSDT", "ALPHAUSDT", "WOOUSDT", "SFPUSDT", "RLCUSDT", "BTCSTUSDT", "1000XECUSDT", "FXSUSDT", "CFXUSDT", "AUDIOUSDT", "IDUSDT", "HFTUSDT", "NEOUSDT", "UNFIUSDT", "SANDUSDT", "CTKUSDT", "MINAUSDT", "CELRUSDT", "AGLDUSDT", "RSRUSDT", "RENUSDT", "JASMYUSDT", "PHBUSDT", "YGGUSDT", "EGLDUSDT", "LUNA2USDT", "ONTUSDT", "VETUSDT", "IMXUSDT", "LQTYUSDT", "COTIUSDT", "CVXUSDT", "ARBUSDT", "BAKEUSDT", "GRTUSDT", "FLMUSDT", "MASKUSDT", "BALUSDT", "SUIUSDT", "DENTUSDT", "TRUUSDT", "CKBUSDT", "SSVUSDT", "C98USDT", "ZENUSDT", "NEARUSDT", "1000SHIBUSDT", "ANTUSDT", "ETHBUSD", "TLMUSDT", "AAVEUSDT", "ICPUSDT", "1000LUNCUSDT", "RADUSDT", "AVAXUSDT", "MAGICUSDT", "ROSEUSDT", "MATICUSDT",	"XVGUSDT", "MKRUSDT", "PEOPLEUSDT", "THETAUSDT", "UNIUSDT", "PERPUSDT", "RVNUSDT", "ARKMUSDT", "NKNUSDT", "KLAYUSDT", "DEFIUSDT", "COMPUSDT", "BTCDOMUSDT", "BTCUSDT", "OMGUSDT", "ICXUSDT", "1000PEPEUSDT", "FETUSDT", "LEVERUSDT", "1000FLOKIUSDT", "FTMUSDT", "DOGEBUSD", "SXPUSDT", "XEMUSDT", "WLDUSDT", "ZILUSDT", "AXSUSDT", "DYDXUSDT", "OCEANUSDT", "CHZUSDT", "DUSKUSDT", "CTSIUSDT", "ACHUSDT"]
 
-# MACD Indicator Parameters
-MACD_SHORT_WINDOW = 12
-MACD_LONG_WINDOW = 26
-MACD_SIGNAL_WINDOW = 9
-
-# RSI Indicator Parameters
-RSI_WINDOW = 14
-
-# Leverage and Margin Type
-LEVERAGE = 20
-MARGIN_TYPE = 'Cross'
-
-# Trailing Stop Percentage
-TRAILING_PERCENTAGE = 1
-
-# Trade Settings
-MAX_OPEN_ORDERS = 5
-MAX_TRADE_SIZE = 10  # Örnek olarak, maksimum işlem boyutu
-
-# Logging Settings
-LOG_LEVEL = 'INFO'
-LOG_FILE = 'logs/bot_log.txt'
-
-# Struct to hold API keys
-APIKeys = namedtuple('APIKeys', ['API_KEY', 'API_SECRET'])
-
-def getAPIKeys():
-    return APIKeys(API_KEY, API_SECRET)
-
+# Bot ayarlarını almak için bir fonksiyon
 def getBotSettings():
-    return {
-        "symbols": SYMBOLS,
-        "macd_short_window": MACD_SHORT_WINDOW,
-        "macd_long_window": MACD_LONG_WINDOW,
-        "macd_signal_window": MACD_SIGNAL_WINDOW,
-        "rsi_window": RSI_WINDOW,
-        "leverage": LEVERAGE,
-        "margin_type": MARGIN_TYPE,
-        "trailing_percentage": TRAILING_PERCENTAGE,
-        "max_open_orders": MAX_OPEN_ORDERS,
-        "max_trade_size": MAX_TRADE_SIZE,
-        "log_level": LOG_LEVEL,
-        "log_file": LOG_FILE
-    }
+    with open('settings.json', 'r') as file:
+        import json
+        settings = json.load(file)
+        return settings
+# Gelişmiş Dinamik Risk Yönetimi için parametreler
+def calculate_quantity(symbol, analysis_result):
+    # İlgili sembol ve analiz sonucuna göre dinamik olarak işlem miktarını hesaplayın
+    # Örnek olarak, belirli bir yüzde veya sabit miktar kullanabilirsiniz
+    # Bu fonksiyonun içeriği, kullanılan strateji ve risk yönetimi politikasına bağlı olarak değişebilir
+    risk_factor = 0.02
+    balance = 1000 # Örnek bakiye
+    quantity = balance * risk_factor # Örnek değer
+    return quantity
+
+# Alım satım sinyallerini belirlemek için bir fonksiyon
+def determine_side(analysis_result):
+    # Analiz sonucuna göre alım veya satım sinyali belirleyin
+    # Örnek olarak, belirli göstergeler veya koşullar kullanabilirsiniz
+    if analysis_result['MACD'] > analysis_result['Signal_Line'] and analysis_result['RSI'] < 70:
+        side = "BUY"
+    elif analysis_result['MACD'] < analysis_result['Signal_Line'] and analysis_result['RSI'] > 30:
+        side = "SELL"
+    else:
+        side = "HOLD"
+    return side
