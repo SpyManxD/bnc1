@@ -1,211 +1,342 @@
-import os
-import sys
-import pandas as pd
-import quantity
+import logging
+import time
+from typing import List, Dict
+
 from binance.client import Client
-import config as cfg
-import config
-from binance_f import RequestClient
+from binance.exceptions import BinanceAPIException
 
-# Redirects stdout to null to disable print
-def blockPrint():
-    sys.stdout = open(os.devnull, 'w')
+from config import Config
 
-# Restores stdout to enable print
-def enablePrint():
-    sys.stdout = sys.__stdout__
-
-# Prints a single line to stdout
-def singlePrint(string):
-    enablePrint()
-    print(string)
-    blockPrint()
-
-def get_macd_rsi_signals(data):
-    # Eğer data bir liste ise, bir DataFrame'e dönüştür
-    if isinstance(data, list):
-        # Sütun adlarını veri yapısına uygun olarak değiştirin
-        data = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'number_of_trades', 'taker_buy_base', 'taker_buy_quote', 'ignored'])
-        data[['open', 'high', 'low', 'close', 'volume']] = data[['open', 'high', 'low', 'close', 'volume']].apply(pd.to_numeric)
-
-    macd, signal_line = calculate_macd(data)
-    rsi = calculate_rsi(data)
-    signals = []
-    for i in range(len(data)):
-        if macd[i] > signal_line[i] and rsi[i] < 30:
-            signals.append('BUY')
-        elif macd[i] < signal_line[i] and rsi[i] > 70:
-            signals.append('SELL')
-        else:
-            signals.append('HOLD')
-    return signals
-
-# p3Binance\bot_functions.py dosyası
-
-def calculate_macd(data):
-    short_window = 12
-    long_window = 26
-    signal_window = 9
-
-    # 'data' içindeki 'close' değerlerini bir pandas serisine dönüştürme
-    close_data = pd.Series(data['close'])
-
-    # Kısa ve uzun hareketli ortalamaları hesaplama
-    short_ema = close_data.ewm(span=short_window, adjust=False).mean()
-    long_ema = close_data.ewm(span=long_window, adjust=False).mean()
-
-    # MACD ve sinyal çizgisini hesaplama
-    macd = short_ema - long_ema
-    signal_line = macd.ewm(span=signal_window, adjust=False).mean()
-
-    return macd, signal_line
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
-def get_data(client, symbol):
-    # Belirli bir sembol için tarihsel fiyat verilerini alın
-    # Örnek olarak, son 100 mumun 1 dakikalık verilerini alabilirsiniz
-    klines = client.futures_klines(symbol=symbol, interval=client.KLINE_INTERVAL_1MINUTE, limit=100)
+class BotFunctions:
+    def __init__(self, config: Config):
+        self.client = Client(config.API_KEY, config.API_SECRET)
+        self.config = config
 
-    # Verileri uygun bir biçime dönüştürün (örneğin, pandas DataFrame)
-    data = {
-        'timestamp': [int(k[0]) for k in klines],
-        'open': [float(k[1]) for k in klines],
-        'high': [float(k[2]) for k in klines],
-        'low': [float(k[3]) for k in klines],
-        'close': [float(k[4]) for k in klines],
-        'volume': [float(k[5]) for k in klines]
-    }
+    def get_balance(self, symbol: str) -> float:
+        balance = self.client.get_asset_balance(asset=symbol)
+        return float(balance['free'])
 
-    return data
+    def get_symbol_info(self, symbol: str) -> Dict:
+        return self.client.get_symbol_info(symbol)
 
-def get_liquidation(client, symbol):
-    # Example logic to retrieve liquidation price
-    liquidation_price = client.futures_mark_price(symbol=symbol)['markPrice']
-    return float(liquidation_price)
+    def get_order_book(self, symbol: str, limit: int = 5) -> Dict:
+        return self.client.get_order_book(symbol=symbol, limit=limit)
 
-# Function to get the entry price of the position the bot entered
-def get_entry(client, symbol):
-    # Example logic to retrieve entry price
-    entry_price = client.futures_position_information(symbol=symbol)[0]['entryPrice']
-    return float(entry_price)
+    def get_recent_trades(self, symbol: str, limit: int = 5) -> List[Dict]:
+        return self.client.get_recent_trades(symbol=symbol, limit=limit)
 
-# Function to execute an order
-def execute_order(client, symbol, order_type, side, position_side, leverage):
-    # Pozisyon tarafını kontrol et
-    if position_side not in ['BOTH', 'LONG', 'SHORT']:
-        raise ValueError("Invalid position side. Must be 'BOTH', 'LONG', or 'SHORT'.")
+    def get_klines(self, symbol: str, interval: str, limit: int = 5) -> List[List]:
+        return self.client.get_klines(symbol=symbol, interval=interval, limit=limit)
 
-    # Siparişi yürüt
-    order = client.futures_create_order(
-        symbol=symbol,
-        side=side,
-        type=order_type,
-        positionSide=position_side,
-        quantity=quantity
-    )
-    return order
+    def create_order(self, symbol: str, side: str, order_type: str, quantity: float, price: float = None) -> Dict:
+        try:
+            if order_type == 'LIMIT':
+                order = self.client.create_order(
+                    symbol=symbol,
+                    side=side,
+                    type=order_type,
+                    timeInForce='GTC',
+                    quantity=quantity,
+                    price=str(price)
+                )
+            else:
+                order = self.client.create_order(
+                    symbol=symbol,
+                    side=side,
+                    type=order_type,
+                    quantity=quantity
+                )
+            return order
+        except BinanceAPIException as e:
+            logger.error(f"An error occurred while creating the order: {e}")
+            return None
 
+    def cancel_order(self, symbol: str, order_id: str) -> Dict:
+        try:
+            result = self.client.cancel_order(symbol=symbol, orderId=order_id)
+            return result
+        except BinanceAPIException as e:
+            logger.error(f"An error occurred while canceling the order: {e}")
+            return None
 
-# Rounds a number to the given precision
-def round_to_precision(number, precision):
-    return round(number, precision)
+    def get_open_orders(self, symbol: str) -> List[Dict]:
+        return self.client.get_open_orders(symbol=symbol)
 
-# Converts candles to a DataFrame with open, high, low, close, and volume columns
-def convert_candles(candles):
-    df = pd.DataFrame(candles, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'number_of_trades', 'taker_buy_base', 'taker_buy_quote', 'ignored'])
-    df[['open', 'high', 'low', 'close', 'volume']] = df[['open', 'high', 'low', 'close', 'volume']].apply(pd.to_numeric)
-    return df
+    def get_order(self, symbol: str, order_id: str) -> Dict:
+        return self.client.get_order(symbol=symbol, orderId=order_id)
 
-# Calculates the Relative Strength Index (RSI) indicator
-def calculate_rsi(data, window=14):
-    # 'data' içindeki 'close' değerlerini bir pandas serisine dönüştürme
-    close_data = pd.Series(data['close'])
+    def get_all_orders(self, symbol: str, limit: int = 5) -> List[Dict]:
+        return self.client.get_all_orders(symbol=symbol, limit=limit)
 
-    # Fiyat değişimlerini hesaplama
-    delta = close_data.diff(1)
+        def get_account(self) -> Dict:
+            return self.client.get_account()
 
-    # Pozitif ve negatif değişimleri ayrı ayrı hesaplama
-    gain = (delta.where(delta > 0, 0))
-    loss = (-delta.where(delta < 0, 0))
+    def get_exchange_info(self) -> Dict:
+        return self.client.get_exchange_info()
 
-    # Ortalama kazanç ve kaybı hesaplama
-    avg_gain = gain.rolling(window=window, min_periods=1).mean()
-    avg_loss = loss.rolling(window=window, min_periods=1).mean()
+    def get_ticker_price(self, symbol: str) -> Dict:
+        return self.client.get_ticker_price(symbol=symbol)
 
-    # RS ve RSI değerlerini hesaplama
-    rs = avg_gain / avg_loss
-    rsi = 100 - (100 / (1 + rs))
+    def get_ticker_24hr(self, symbol: str) -> Dict:
+        return self.client.get_ticker_24hr(symbol=symbol)
 
-    return rsi
+    def get_historical_trades(self, symbol: str, limit: int = 5) -> List[Dict]:
+        return self.client.get_historical_trades(symbol=symbol, limit=limit)
 
-# Processes high-frequency data and returns processed data
-def process_high_frequency_data(data):
-    # 'data' sözlüğünü bir pandas DataFrame'e dönüştürme
-    data_df = pd.DataFrame(data)
+    def get_aggregate_trades(self, symbol: str, limit: int = 5) -> List[Dict]:
+        return self.client.get_aggregate_trades(symbol=symbol, limit=limit)
 
-    # 'timestamp' sütununu bir tarih/zaman indeksi olarak ayarlama
-    data_df['timestamp'] = pd.to_datetime(data_df['timestamp'])
-    data_df.set_index('timestamp', inplace=True)
+    def get_avg_price(self, symbol: str) -> Dict:
+        return self.client.get_avg_price(symbol=symbol)
 
-    # Verileri dakika bazında yeniden örneklemek ve OHLC değerlerini hesaplamak
-    processed_data = data_df.resample('1T').ohlc()
+    def get_depth(self, symbol: str, limit: int = 5) -> Dict:
+        return self.client.get_depth(symbol=symbol, limit=limit)
 
-    return processed_data
+    def ping(self) -> bool:
+        return self.client.ping()
 
-# Executes advanced trades based on the given signals
-def execute_advanced_trades(client, symbol, signals, leverage, margin_type, trailing_percentage):
-    # Example logic to execute advanced trades
-    # This can be customized based on specific requirements
-    for signal in signals:
-        if signal == 'BUY':
-            execute_order(client, symbol, 'MARKET', 'BUY', 'LONG', leverage)
-        elif signal == 'SELL':
-            execute_order(client, symbol, 'MARKET', 'SELL', 'SHORT', leverage)
-        # Add logic for trailing stop-loss, margin type, etc.
+    def get_server_time(self) -> Dict:
+        return self.client.get_server_time()
 
-# Monitors the market and sends alerts in real-time
+    def get_exchange_status(self) -> Dict:
+        return self.client.get_system_status()
 
-def dynamic_risk_management(client, symbols):
-    # Example logic to implement dynamic risk management
-    # This can be customized based on specific requirements
-    for symbol in symbols:
-        position = client.futures_position_information(symbol=symbol)[0]
-        # Add logic to adjust position size, stop-loss, etc., based on risk parameters
+    def get_leverage(self, symbol: str) -> Dict:
+        return self.client.futures_get_leverage(symbol=symbol)
 
-# Implements advanced multi-symbol support
-def advanced_multi_symbol_support(client, symbols):
-    # Example logic to implement advanced multi-symbol support
-    # This can be customized based on specific requirements
-    for symbol in symbols:
-        candles = client.futures_klines(symbol=symbol, interval=Client.KLINE_INTERVAL_1MINUTE)
-        data = convert_candles(candles)
-        signals = get_macd_rsi_signals(data)
-        execute_advanced_trades(client, symbol, signals, leverage=20, margin_type='Cross', trailing_percentage=1)
+    def set_leverage(self, symbol: str, leverage: int) -> Dict:
+        return self.client.futures_change_leverage(symbol=symbol, leverage=leverage)
 
-# Implements advanced automatic trade execution
-def advanced_automatic_trade_execution(client, symbol):
-    # Infinite loop to continuously monitor and trade
-    while True:
-        # Get the latest candlestick data for the symbol
-        candles = client.futures_klines(symbol=symbol, interval=Client.KLINE_INTERVAL_1MINUTE)
-        data = convert_candles(candles) # Assuming you have a function to convert candles to the required data format
+    def get_margin_type(self, symbol: str) -> Dict:
+        return self.client.futures_get_margin_type(symbol=symbol)
 
-        # Get trading signals based on MACD and RSI
-        signals = get_macd_rsi_signals(data)
+    def set_margin_type(self, symbol: str, margin_type: str) -> Dict:
+        return self.client.futures_change_margin_type(symbol=symbol, marginType=margin_type)
 
-        # Execute trades based on the signals
-        execute_advanced_trades(client, symbol, signals, leverage=20, margin_type='Cross', trailing_percentage=1)
+    def get_position_info(self, symbol: str) -> Dict:
+        return self.client.futures_position_information(symbol=symbol)
 
+    def get_income_history(self, symbol: str, income_type: str, limit: int = 5) -> List[Dict]:
+        return self.client.futures_income_history(symbol=symbol, incomeType=income_type, limit=limit)
 
-# Main function to run the bot
-def run_bot():
-    client = init_client()
-    api_key = config.API_KEY
-    api_secret = config.API_SECRET
-    symbols = ["SUSHIUSDT", "BTSUSDT", "INJUSDT", "BNTUSDT", "RDNTUSDT", "ZRXUSDT", "HIGHUSDT", "WAVESUSDT", "SPELLUSDT", "XTZUSDT", "DARUSDT", "JOEUSDT", "XMRUSDT", "PENDLEUSDT", "ALICEUSDT", "HOOKUSDT", "REEFUSDT", "BATUSDT", "DOGEUSDT", "TRXUSDT", "STORJUSDT", "SNXUSDT", "XLMUSDT", "IOTXUSDT", "DASHUSDT", "UMAUSDT", "KAVAUSDT", "OXTUSDT", "RUNEUSDT", "APEUSDT", "BLUEBIRDUSDT", "BNXUSDT", "OPUSDT", "KEYUSDT", "DGBUSDT", "SKLUSDT", "FOOTBALLUSDT", "TOMOUSDT", "MTLUSDT", "ETHBTC", "KSMUSDT", "BNBBUSD", "TRBUSDT", "MANAUSDT", "FLOWUSDT", "CHRUSDT", "GALUSDT", "USDCUSDT", "OGNUSDT", "RNDRUSDT", "SCUSDT", "KNCUSDT", "BLURUSDT", "ENJUSDT", "ATOMUSDT", "SOLBUSD", "NMRUSDT", "ENSUSDT", "ATAUSDT", "AGIXUSDT", "IOSTUSDT", "HBARUSDT", "ZECUSDT", "IDEXUSDT", "GALAUSDT", "EDUUSDT", "GTCUSDT", "ALGOUSDT", "LRCUSDT", "STGUSDT", "STXUSDT", "ARPAUSDT", "CELOUSDT", "QNTUSDT", "1INCHUSDT", "TUSDT", "LINAUSDT", "ARUSDT", "FILUSDT", "DODOXUSDT", "SOLUSDT", "COMBOUSDT", "GMTUSDT", "MDTUSDT", "XVSUSDT", "GMXUSDT", "BANDUSDT", "LDOUSDT", "XRPBUSD", "CRVUSDT", "BELUSDT", "ONEUSDT", "APTUSDT", "ANKRUSDT", "MAVUSDT", "RAYUSDT", "API3USDT", "ASTRUSDT", "HOTUSDT", "QTUMUSDT", "IOTAUSDT", "BTCBUSD", "LITUSDT", "YFIUSDT", "ETHUSDT", "ALPHAUSDT", "WOOUSDT", "SFPUSDT", "RLCUSDT", "BTCSTUSDT", "1000XECUSDT", "FXSUSDT", "CFXUSDT", "AUDIOUSDT", "IDUSDT", "HFTUSDT", "NEOUSDT", "UNFIUSDT", "SANDUSDT", "CTKUSDT", "MINAUSDT", "CELRUSDT", "AGLDUSDT", "RSRUSDT", "RENUSDT", "JASMYUSDT", "PHBUSDT", "YGGUSDT", "EGLDUSDT", "LUNA2USDT", "ONTUSDT", "VETUSDT", "IMXUSDT", "LQTYUSDT", "COTIUSDT", "CVXUSDT", "ARBUSDT", "BAKEUSDT", "GRTUSDT", "FLMUSDT", "MASKUSDT", "BALUSDT", "SUIUSDT", "DENTUSDT", "TRUUSDT", "CKBUSDT", "SSVUSDT", "C98USDT", "ZENUSDT", "NEARUSDT", "1000SHIBUSDT", "ANTUSDT", "ETHBUSD", "TLMUSDT", "AAVEUSDT", "ICPUSDT", "1000LUNCUSDT", "RADUSDT", "AVAXUSDT", "MAGICUSDT", "ROSEUSDT", "MATICUSDT",	"XVGUSDT", "MKRUSDT", "PEOPLEUSDT", "THETAUSDT", "UNIUSDT", "PERPUSDT", "RVNUSDT", "ARKMUSDT", "NKNUSDT", "KLAYUSDT", "DEFIUSDT", "COMPUSDT", "BTCDOMUSDT", "BTCUSDT", "OMGUSDT", "ICXUSDT", "1000PEPEUSDT", "FETUSDT", "LEVERUSDT", "1000FLOKIUSDT", "FTMUSDT", "DOGEBUSD", "SXPUSDT", "XEMUSDT", "WLDUSDT", "ZILUSDT", "AXSUSDT", "DYDXUSDT", "OCEANUSDT", "CHZUSDT", "DUSKUSDT", "CTSIUSDT", "ACHUSDT"]
-    advanced_multi_symbol_support(client, symbols)
-    monitor_and_alert(client, 'BTCUSDT')
-    dynamic_risk_management(client, symbols)
+    def get_futures_ticker(self, symbol: str) -> Dict:
+        return self.client.futures_ticker(symbol=symbol)
 
-if __name__ == "__main__":
-    run_bot()
+    def get_futures_orderbook_ticker(self, symbol: str) -> Dict:
+        return self.client.futures_orderbook_ticker(symbol=symbol)
+
+    def get_futures_liquidation_orders(self, symbol: str, limit: int = 5) -> List[Dict]:
+        return self.client.futures_liquidation_orders(symbol=symbol, limit=limit)
+
+    def get_futures_open_interest(self, symbol: str) -> Dict:
+        return self.client.futures_open_interest(symbol=symbol)
+
+    def get_futures_leverage_bracket(self, symbol: str) -> Dict:
+        return self.client.futures_leverage_bracket(symbol=symbol)
+
+    def get_futures_mark_price(self, symbol: str) -> Dict:
+        return self.client.futures_mark_price(symbol=symbol)
+
+    def get_futures_funding_rate(self, symbol: str) -> Dict:
+        return self.client.futures_funding_rate(symbol=symbol)
+
+    def get_futures_long_short_ratio(self, symbol: str) -> Dict:
+        return self.client.futures_long_short_ratio(symbol=symbol)
+
+        def get_futures_taker_buy_sell_ratio(self, symbol: str) -> Dict:
+            return self.client.futures_taker_buy_sell_ratio(symbol=symbol)
+
+    def get_futures_orderbook(self, symbol: str, limit: int = 5) -> Dict:
+        return self.client.futures_orderbook(symbol=symbol, limit=limit)
+
+    def get_futures_recent_trades(self, symbol: str, limit: int = 5) -> List[Dict]:
+        return self.client.futures_recent_trades(symbol=symbol, limit=limit)
+
+    def get_futures_historical_trades(self, symbol: str, limit: int = 5) -> List[Dict]:
+        return self.client.futures_historical_trades(symbol=symbol, limit=limit)
+
+    def get_futures_aggregate_trades(self, symbol: str, limit: int = 5) -> List[Dict]:
+        return self.client.futures_aggregate_trades(symbol=symbol, limit=limit)
+
+    def get_futures_klines(self, symbol: str, interval: str, limit: int = 5) -> List[Dict]:
+        return self.client.futures_klines(symbol=symbol, interval=interval, limit=limit)
+
+    def get_futures_continuous_klines(self, symbol: str, interval: str, limit: int = 5) -> List[Dict]:
+        return self.client.futures_continuous_klines(symbol=symbol, interval=interval, limit=limit)
+
+    def get_futures_index_price_klines(self, symbol: str, interval: str, limit: int = 5) -> List[Dict]:
+        return self.client.futures_index_price_klines(symbol=symbol, interval=interval, limit=limit)
+
+    def get_futures_mark_price_klines(self, symbol: str, interval: str, limit: int = 5) -> List[Dict]:
+        return self.client.futures_mark_price_klines(symbol=symbol, interval=interval, limit=limit)
+
+    def get_futures_margin_data(self, symbol: str) -> Dict:
+        return self.client.futures_margin_data(symbol=symbol)
+
+    def get_futures_position_margin_history(self, symbol: str, limit: int = 5) -> List[Dict]:
+        return self.client.futures_position_margin_history(symbol=symbol, limit=limit)
+
+    def get_futures_account_balance(self) -> List[Dict]:
+        return self.client.futures_account_balance()
+
+    def get_futures_account(self) -> Dict:
+        return self.client.futures_account()
+
+    def get_futures_position_risk(self) -> List[Dict]:
+        return self.client.futures_position_risk()
+
+    def get_futures_trade_list(self, symbol: str, limit: int = 5) -> List[Dict]:
+        return self.client.futures_trade_list(symbol=symbol, limit=limit)
+
+    def get_futures_income_history(self, symbol: str, limit: int = 5) -> List[Dict]:
+        return self.client.futures_income_history(symbol=symbol, limit=limit)
+
+    def get_futures_leverage_bracket(self) -> List[Dict]:
+        return self.client.futures_leverage_bracket()
+
+    def get_futures_adl_quantile(self, symbol: str) -> Dict:
+        return self.client.futures_adl_quantile(symbol=symbol)
+
+    def get_futures_api_trading_status(self) -> Dict:
+        return self.client.futures_api_trading_status()
+
+    def get_futures_data_stream(self) -> Dict:
+        return self.client.futures_data_stream()
+
+    def get_futures_symbol_orderbook_ticker(self, symbol: str) -> Dict:
+        return self.client.futures_symbol_orderbook_ticker(symbol=symbol)
+
+    def get_futures_symbol_price_ticker(self, symbol: str) -> Dict:
+        return self.client.futures_symbol_price_ticker(symbol=symbol)
+
+    def get_futures_symbol_order_list(self, symbol: str) -> Dict:
+        return self.client.futures_symbol_order_list(symbol=symbol)
+
+    def get_futures_all_orders(self, symbol: str) -> List[Dict]:
+        return self.client.futures_all_orders(symbol=symbol)
+
+    def get_futures_open_orders(self, symbol: str) -> List[Dict]:
+        return self.client.futures_open_orders(symbol=symbol)
+
+    def get_futures_open_order(self, symbol: str, orderId: str) -> Dict:
+        return self.client.futures_get_order(symbol=symbol, orderId=orderId)
+
+        def create_futures_order(self, symbol: str, side: str, type: str, quantity: float, price: float = None,
+                                 timeInForce: str = None, newClientOrderId: str = None, stopPrice: float = None,
+                                 icebergQty: float = None, newOrderRespType: str = 'RESULT') -> Dict:
+            return self.client.futures_create_order(symbol=symbol, side=side, type=type, quantity=quantity, price=price,
+                                                    timeInForce=timeInForce, newClientOrderId=newClientOrderId,
+                                                    stopPrice=stopPrice, icebergQty=icebergQty,
+                                                    newOrderRespType=newOrderRespType)
+
+    def cancel_futures_order(self, symbol: str, orderId: str = None, origClientOrderId: str = None) -> Dict:
+        return self.client.futures_cancel_order(symbol=symbol, orderId=orderId, origClientOrderId=origClientOrderId)
+
+    def cancel_all_futures_open_orders(self, symbol: str) -> Dict:
+        return self.client.futures_cancel_all_open_orders(symbol=symbol)
+
+    def cancel_futures_open_orders(self, symbol: str) -> Dict:
+        return self.client.futures_cancel_open_orders(symbol=symbol)
+
+    def change_futures_margin_type(self, symbol: str, marginType: str) -> Dict:
+        return self.client.futures_change_margin_type(symbol=symbol, marginType=marginType)
+
+    def change_futures_leverage(self, symbol: str, leverage: int) -> Dict:
+        return self.client.futures_change_leverage(symbol=symbol, leverage=leverage)
+
+    def change_futures_position_margin(self, symbol: str, amount: float, type: int) -> Dict:
+        return self.client.futures_change_position_margin(symbol=symbol, amount=amount, type=type)
+
+    def create_futures_data_stream(self) -> Dict:
+        return self.client.futures_create_data_stream()
+
+    def keepalive_futures_data_stream(self, listenKey: str) -> Dict:
+        return self.client.futures_keepalive_data_stream(listenKey=listenKey)
+
+    def close_futures_data_stream(self, listenKey: str) -> Dict:
+        return self.client.futures_close_data_stream(listenKey=listenKey)
+
+    def get_futures_ping(self) -> Dict:
+        return self.client.futures_ping()
+
+    def get_futures_time(self) -> Dict:
+        return self.client.futures_time()
+
+    def get_futures_exchange_info(self) -> Dict:
+        return self.client.futures_exchange_info()
+
+    def get_futures_system_status(self) -> Dict:
+        return self.client.futures_system_status()
+
+    def get_futures_account_status(self) -> Dict:
+        return self.client.futures_account_status()
+
+    def get_futures_api_permissions(self) -> Dict:
+        return self.client.futures_api_permissions()
+
+        def get_futures_account(self) -> Dict:
+            return self.client.futures_account()
+
+    def get_futures_account_balance(self) -> Dict:
+        return self.client.futures_account_balance()
+
+    def get_futures_trade_fee(self) -> Dict:
+        return self.client.futures_trade_fee()
+
+    def get_futures_position_margin_history(self, symbol: str, type: int = None, startTime: int = None,
+                                            endTime: int = None, limit: int = None) -> Dict:
+        return self.client.futures_position_margin_history(symbol=symbol, type=type, startTime=startTime,
+                                                           endTime=endTime, limit=limit)
+
+    def get_futures_income_history(self, symbol: str = None, incomeType: str = None, startTime: int = None,
+                                   endTime: int = None, limit: int = None, archived: str = None) -> Dict:
+        return self.client.futures_income_history(symbol=symbol, incomeType=incomeType, startTime=startTime,
+                                                  endTime=endTime, limit=limit, archived=archived)
+
+    def get_futures_leverage_bracket(self, symbol: str = None) -> Dict:
+        return self.client.futures_leverage_bracket(symbol=symbol)
+
+    def get_futures_adl_quantile(self, symbol: str) -> Dict:
+        return self.client.futures_adl_quantile(symbol=symbol)
+
+    def get_futures_notional_and_leverage_brackets(self) -> Dict:
+        return self.client.futures_notional_and_leverage_brackets()
+
+    def get_futures_user_trades(self, symbol: str, startTime: int = None, endTime: int = None, limit: int = None,
+                                fromId: int = None) -> Dict:
+        return self.client.futures_user_trades(symbol=symbol, startTime=startTime, endTime=endTime, limit=limit,
+                                               fromId=fromId)
+
+    def get_futures_data_stream(self, listenKey: str) -> Dict:
+        return self.client.futures_data_stream(listenKey=listenKey)
+
+    def get_futures_mark_price(self, symbol: str = None) -> Dict:
+        return self.client.futures_mark_price(symbol=symbol)
+
+    def get_futures_funding_rate(self, symbol: str, startTime: int = None, endTime: int = None, limit: int = None) -> Dict:
+        return self.client.futures_funding_rate(symbol=symbol, startTime=startTime, endTime=endTime, limit=limit)
+
+    def get_futures_ticker(self, symbol: str) -> Dict:
+        return self.client.futures_ticker(symbol=symbol)
+
+    def get_futures_orderbook_ticker(self, symbol: str) -> Dict:
+        return self.client.futures_orderbook_ticker(symbol=symbol)
+
+    def get_futures_liquidation_orders(self, symbol: str = None, startTime: int = None, endTime: int = None,
+                                       limit: int = None) -> Dict:
+        return self.client.futures_liquidation_orders(symbol=symbol, startTime=startTime, endTime=endTime, limit=limit)
+
+    def get_futures_open_interest(self, symbol: str) -> Dict:
+        return self.client.futures_open_interest(symbol=symbol)
+
+    def get_futures_position_risk(self) -> Dict:
+        return self.client.futures_position_risk()
+
+    def get_futures_account_trades(self, symbol: str, startTime: int = None, endTime: int = None, limit: int = None,
+                                   fromId: int = None) -> Dict:
+        return self.client.futures_account_trades(symbol=symbol, startTime=startTime, endTime=endTime, limit=limit,
+                                                  fromId=fromId)
