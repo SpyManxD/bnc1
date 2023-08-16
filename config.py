@@ -23,8 +23,12 @@ MARGIN_TYPE = 'Cross'
 TRAILING_PERCENTAGE = 1
 
 # Struct to hold API keys
-APIKeys = namedtuple('APIKeys', ['api_key', 'api_secret'])
+APIKeys = namedtuple('APIKeys', ['API_KEY', 'API_SECRET'])
 def getAPIKeys():
+    """
+
+    :return:
+    """
     return APIKeys(API_KEY, API_SECRET)
 
 def getBotSettings():

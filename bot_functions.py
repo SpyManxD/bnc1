@@ -1,8 +1,10 @@
 import os
 import sys
 import pandas as pd
+import quantity
 from binance.client import Client
 import config as cfg
+import config
 from binance_f import RequestClient
 
 # Redirects stdout to null to disable print
@@ -76,13 +78,6 @@ def get_data(client, symbol):
 
     return data
 
-# Initializes the Binance client
-def init_client():
-    keys = cfg.getAPIKeys()
-    client = Client(keys.api_key, keys.api_secret, {"verify": True, "timeout": 20})
-    return client
-
-# Function to get the liquidation price for a given market
 def get_liquidation(client, symbol):
     # Example logic to retrieve liquidation price
     liquidation_price = client.futures_mark_price(symbol=symbol)['markPrice']
@@ -95,10 +90,21 @@ def get_entry(client, symbol):
     return float(entry_price)
 
 # Function to execute an order
-def execute_order(client, symbol, order_type, side, position_side, quantity):
-    # Example logic to execute the order
-    order = client.futures_create_order(symbol=symbol, side=side, type=order_type, positionSide=position_side, quantity=quantity)
+def execute_order(client, symbol, order_type, side, position_side, leverage):
+    # Pozisyon tarafını kontrol et
+    if position_side not in ['BOTH', 'LONG', 'SHORT']:
+        raise ValueError("Invalid position side. Must be 'BOTH', 'LONG', or 'SHORT'.")
+
+    # Siparişi yürüt
+    order = client.futures_create_order(
+        symbol=symbol,
+        side=side,
+        type=order_type,
+        positionSide=position_side,
+        quantity=quantity
+    )
     return order
+
 
 # Rounds a number to the given precision
 def round_to_precision(number, precision):
@@ -158,19 +164,7 @@ def execute_advanced_trades(client, symbol, signals, leverage, margin_type, trai
         # Add logic for trailing stop-loss, margin type, etc.
 
 # Monitors the market and sends alerts in real-time
-def monitor_and_alert(client, symbol):
-    request_client = RequestClient(api_key=client.API_KEY, secret_key=client.API_SECRET)
-    ticker_price_list = request_client.get_symbol_price_ticker(symbol=symbol)
 
-    # Listenin içeriğini yazdır
-    print(f"Ticker price list for {symbol}: {ticker_price_list}")
-
-    # İlk öğenin fiyatını al (eğer uygunsa)
-    current_price = ticker_price_list[0].price if ticker_price_list else None
-    print(f"Current price for {symbol}: {current_price}")
-
-
-# Implements dynamic risk management strategies
 def dynamic_risk_management(client, symbols):
     # Example logic to implement dynamic risk management
     # This can be customized based on specific requirements
@@ -206,6 +200,8 @@ def advanced_automatic_trade_execution(client, symbol):
 # Main function to run the bot
 def run_bot():
     client = init_client()
+    api_key = config.API_KEY
+    api_secret = config.API_SECRET
     symbols = ["SUSHIUSDT", "BTSUSDT", "INJUSDT", "BNTUSDT", "RDNTUSDT", "ZRXUSDT", "HIGHUSDT", "WAVESUSDT", "SPELLUSDT", "XTZUSDT", "DARUSDT", "JOEUSDT", "XMRUSDT", "PENDLEUSDT", "ALICEUSDT", "HOOKUSDT", "REEFUSDT", "BATUSDT", "DOGEUSDT", "TRXUSDT", "STORJUSDT", "SNXUSDT", "XLMUSDT", "IOTXUSDT", "DASHUSDT", "UMAUSDT", "KAVAUSDT", "OXTUSDT", "RUNEUSDT", "APEUSDT", "BLUEBIRDUSDT", "BNXUSDT", "OPUSDT", "KEYUSDT", "DGBUSDT", "SKLUSDT", "FOOTBALLUSDT", "TOMOUSDT", "MTLUSDT", "ETHBTC", "KSMUSDT", "BNBBUSD", "TRBUSDT", "MANAUSDT", "FLOWUSDT", "CHRUSDT", "GALUSDT", "USDCUSDT", "OGNUSDT", "RNDRUSDT", "SCUSDT", "KNCUSDT", "BLURUSDT", "ENJUSDT", "ATOMUSDT", "SOLBUSD", "NMRUSDT", "ENSUSDT", "ATAUSDT", "AGIXUSDT", "IOSTUSDT", "HBARUSDT", "ZECUSDT", "IDEXUSDT", "GALAUSDT", "EDUUSDT", "GTCUSDT", "ALGOUSDT", "LRCUSDT", "STGUSDT", "STXUSDT", "ARPAUSDT", "CELOUSDT", "QNTUSDT", "1INCHUSDT", "TUSDT", "LINAUSDT", "ARUSDT", "FILUSDT", "DODOXUSDT", "SOLUSDT", "COMBOUSDT", "GMTUSDT", "MDTUSDT", "XVSUSDT", "GMXUSDT", "BANDUSDT", "LDOUSDT", "XRPBUSD", "CRVUSDT", "BELUSDT", "ONEUSDT", "APTUSDT", "ANKRUSDT", "MAVUSDT", "RAYUSDT", "API3USDT", "ASTRUSDT", "HOTUSDT", "QTUMUSDT", "IOTAUSDT", "BTCBUSD", "LITUSDT", "YFIUSDT", "ETHUSDT", "ALPHAUSDT", "WOOUSDT", "SFPUSDT", "RLCUSDT", "BTCSTUSDT", "1000XECUSDT", "FXSUSDT", "CFXUSDT", "AUDIOUSDT", "IDUSDT", "HFTUSDT", "NEOUSDT", "UNFIUSDT", "SANDUSDT", "CTKUSDT", "MINAUSDT", "CELRUSDT", "AGLDUSDT", "RSRUSDT", "RENUSDT", "JASMYUSDT", "PHBUSDT", "YGGUSDT", "EGLDUSDT", "LUNA2USDT", "ONTUSDT", "VETUSDT", "IMXUSDT", "LQTYUSDT", "COTIUSDT", "CVXUSDT", "ARBUSDT", "BAKEUSDT", "GRTUSDT", "FLMUSDT", "MASKUSDT", "BALUSDT", "SUIUSDT", "DENTUSDT", "TRUUSDT", "CKBUSDT", "SSVUSDT", "C98USDT", "ZENUSDT", "NEARUSDT", "1000SHIBUSDT", "ANTUSDT", "ETHBUSD", "TLMUSDT", "AAVEUSDT", "ICPUSDT", "1000LUNCUSDT", "RADUSDT", "AVAXUSDT", "MAGICUSDT", "ROSEUSDT", "MATICUSDT",	"XVGUSDT", "MKRUSDT", "PEOPLEUSDT", "THETAUSDT", "UNIUSDT", "PERPUSDT", "RVNUSDT", "ARKMUSDT", "NKNUSDT", "KLAYUSDT", "DEFIUSDT", "COMPUSDT", "BTCDOMUSDT", "BTCUSDT", "OMGUSDT", "ICXUSDT", "1000PEPEUSDT", "FETUSDT", "LEVERUSDT", "1000FLOKIUSDT", "FTMUSDT", "DOGEBUSD", "SXPUSDT", "XEMUSDT", "WLDUSDT", "ZILUSDT", "AXSUSDT", "DYDXUSDT", "OCEANUSDT", "CHZUSDT", "DUSKUSDT", "CTSIUSDT", "ACHUSDT"]
     advanced_multi_symbol_support(client, symbols)
     monitor_and_alert(client, 'BTCUSDT')

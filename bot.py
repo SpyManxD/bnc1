@@ -38,9 +38,6 @@ try:
         # Advanced Automatic Trade Execution
         bf.execute_advanced_trades(client, symbol, signals, leverage, margin_type, trailing_percentage)
 
-        # Advanced Real-time Monitoring and Alerts
-        bf.monitor_and_alert(client, symbol)
-
         time.sleep(1)  # Sleep to avoid hitting the rate limits
 
     # Advanced Dynamic Risk Management
