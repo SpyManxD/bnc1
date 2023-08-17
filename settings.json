@@ -1,18 +1,8 @@
 {
-  "symbols": ["BTCUSDT", "ETHUSDT", "LTCUSDT"],
-  "timeframe": "1m",
-  "risk_factor": 0.02,
   "leverage": 10,
+  "time_frames": ["1m", "3m", "5m"],
+  "symbol_filter": "USDT",
+  "max_risk": 0.02,
   "stop_loss": 0.01,
-  "take_profit": 0.05,
-  "trading_mode": "live",
-  "alert_settings": {
-    "email": "semihozturk27@gmail.com",
-    "sms": "+905434089084",
-    "push_notifications": true
-  },
-  "monitoring_settings": {
-    "refresh_rate": 5,
-    "log_file": "trading_log.txt"
-  }
+  "other_settings": "value"
 }
